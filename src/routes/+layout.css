@@ -1,0 +1,54 @@
+@import 'tailwindcss';
+@plugin 'flowbite/plugin';
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+	--color-primary-50: #f0f9ff;
+	--color-primary-100: #e0f2fe;
+	--color-primary-200: #bae6fd;
+	--color-primary-300: #7dd3fc;
+	--color-primary-400: #38bdf8;
+	--color-primary-500: #0ea5e9;
+	--color-primary-600: #0284c7;
+	--color-primary-700: #0369a1;
+	--color-primary-800: #075985;
+	--color-primary-900: #0c4a6e;
+
+	--color-secondary-50: #fff5f2;
+	--color-secondary-100: #fff1ee;
+	--color-secondary-200: #ffe4de;
+	--color-secondary-300: #ffd5cc;
+	--color-secondary-400: #ffbcad;
+	--color-secondary-500: #fe795d;
+	--color-secondary-600: #ef562f;
+	--color-secondary-700: #eb4f27;
+	--color-secondary-800: #cc4522;
+	--color-secondary-900: #a5371b;
+}
+
+@source '../../node_modules/flowbite-svelte/dist';
+@source '../../node_modules/flowbite-svelte-icons/dist';
+@source '../../node_modules/@flowbite-svelte-plugins/chart/dist';
+
+@layer components {
+	/* overwrite runeswebkit.css using !important */
+	.dark_bg_theme {
+		@apply dark:bg-stone-900;
+	}
+}
+
+@layer base {
+	html,
+	body {
+		@apply h-full;
+	}
+	html {
+		@apply bg-white text-neutral-900 dark:bg-gray-800 dark:text-neutral-100;
+	}
+	button,
+	[type='button'],
+	[type='reset'],
+	[type='submit'] {
+		cursor: pointer;
+	}
+}

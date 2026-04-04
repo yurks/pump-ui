@@ -1,0 +1,20 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"hello_world": "Вітаю, {name}",
+	"control_page_title": "Керуввння",
+	"charts_page_title": "Графік",
+	"settings_page_title": "Налаштування",
+	"pressure": "Тиск",
+	"voltage": "Напруга",
+	"current": "Струм",
+	"temperature": "Температура",
+	"time_seconds": "{value}c",
+	"time_minutes": "{value}хв",
+	"socket_connected": "Онлайн",
+	"socket_waiting": "Очікування",
+	"socket_connecting": "Підключення",
+	"socket_disconnected": "Оффлайн",
+	"socket_error": "Помилка",
+	"control_on": "Вмикнути",
+	"control_off": "Вимикнути"
+}

@@ -1,0 +1,32 @@
+node_modules
+
+.idea/*
+!.idea/jsLinters
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env.development.local
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+# Paraglide
+src/lib/paraglide
+project.inlang/cache/
