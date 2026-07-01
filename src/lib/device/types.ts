@@ -16,7 +16,7 @@ export type DeviceClient = {
 export type DeviceClientMessage =
 	| {
 			type: 'cmd';
-			payload: DeviceCmd<TelemetryCmd | StateCmd | StatusCmd>;
+			payload: DeviceCmdPatch<TelemetryCmd | StateCmd | StatusCmd>;
 	  }
 	| {
 			type: 'ping';
@@ -82,3 +82,17 @@ export type StatusCmd = {
 	};
 	PumpType: string;
 };
+
+export type DeviceCmdPatch<T> =
+    | {
+          cmd: "telemetry";
+          data: Partial<TelemetryCmd>;
+      }
+    | {
+          cmd: "state";
+          data: Partial<StateCmd>;
+      }
+    | {
+          cmd: "status";
+          data: Partial<StatusCmd>;
+      };

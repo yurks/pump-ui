@@ -4,9 +4,13 @@ import { validateDeviceServerMessage } from '$lib/device/validations';
 import {
 	type DeviceClient,
 	type DeviceClientMessage,
-	type DeviceRemoteControls,
 	type DeviceRemoteState,
-	type DeviceServerMessage
+	type DeviceServerMessage,
+	type DeviceCmd,
+	type TelemetryCmd,
+	type StateCmd,
+	type StatusCmd,
+	type DeviceCmdPatch
 } from './types.ts';
 
 import { browser } from '$app/environment';
@@ -89,7 +93,7 @@ export function createDeviceClient({
 		state.stale = ageMs > staleDataAfterMs;
 	}
 
-	function applyRemoteState(nextState: DeviceRemoteState) {
+	function applyRemoteState(nextState: DeviceCmd<TelemetryCmd | StateCmd | StatusCmd>) {
 		// We deliberately use local receipt time, not payload.ts.
 		// Remote clocks drift. Humans also drift, but usually with worse excuses.
 		state.data = nextState;
@@ -160,7 +164,7 @@ export function createDeviceClient({
 
 		unsubscribeMessage = connector.onMessage((message) => {
 			switch (message.type) {
-				case 'state': {
+				case 'cmd_result': {
 					applyRemoteState(message.payload);
 					resolvePendingUpdate();
 					break;
@@ -207,7 +211,7 @@ export function createDeviceClient({
 		state.updating = false;
 	}
 
-	async function update(controlsPatch: Partial<DeviceRemoteControls>): Promise<void> {
+	async function update<T>(controlsPatch: DeviceCmdPatch<T>): Promise<void> {
 		if (pendingUpdate || state.updating) {
 			const message = 'Update already in progress';
 			setLastError(message);
@@ -236,8 +240,8 @@ export function createDeviceClient({
 
 			try {
 				connector.send({
-					type: 'update',
-					payload: { controls: controlsPatch }
+					type: 'cmd',
+					payload: controlsPatch
 				});
 			} catch (error) {
 				const message = error instanceof Error ? error.message : 'Failed to send update';

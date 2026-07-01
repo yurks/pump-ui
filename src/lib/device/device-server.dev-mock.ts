@@ -3,7 +3,8 @@ import type {
 	DeviceServerMessage,
 	DeviceRemoteState,
 	DeviceCmd,
-	TelemetryCmd
+	TelemetryCmd,
+	DeviceCmdPatch
 } from '$lib/device/types';
 
 /*
