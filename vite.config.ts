@@ -2,6 +2,7 @@ import { paraglideVitePlugin } from '@inlang/paraglide-js';
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
+import { compression } from 'vite-plugin-compression2';
 
 import { viteNearbyMock } from './vite.nearby-mock.ts';
 
@@ -14,6 +15,15 @@ export default defineConfig({
 			project: './project.inlang',
 			outdir: './src/lib/paraglide',
 			strategy: ['cookie', 'baseLocale']
-		})
+		}),
+compression({
+      algorithm: 'gzip',
+      //deleteOriginalAssets: true,
+      include: [/\.(js)$/, /\.(css)$/, /\.(html)$/]
+    }),
+//    compression({
+//      algorithm: 'brotliCompress',
+//      exclude: [/\.(br)$/, /\.(gz)$/],
+//    })
 	]
 });

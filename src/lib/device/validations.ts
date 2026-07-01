@@ -17,10 +17,8 @@ export function validateDeviceServerMessage(msg: unknown) {
 	const value = msg as DeviceServerMessage;
 
 	if (
-		value.type === 'state' &&
-		isRecord(value.payload.info) &&
-		isRecord(value.payload.controls) &&
-		isRecord(value.payload.metrics)
+		value.type === 'cmd_result' &&
+		isRecord(value.payload)
 	) {
 		return;
 	}

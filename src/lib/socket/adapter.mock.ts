@@ -110,7 +110,7 @@ export function createSocketAdapter(_url: string): SocketAdapter {
 			server.tick();
 
 			const message: DeviceServerMessage = {
-				type: 'state',
+				type: 'cmd_result',
 				payload: server.snapshot()
 			};
 
