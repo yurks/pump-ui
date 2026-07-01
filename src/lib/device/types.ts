@@ -37,6 +37,15 @@ export type DeviceServerMessage =
 			payload: { message: string; code?: string };
 	  };
 
+type DeviceRequest =
+    | { cmd: "telemetry" }
+    | { cmd: "state" }
+    | { cmd: "status" }
+    | { cmd: "set_state"; data: Partial<StateCmd> }
+    | { cmd: "set_config"; data: Partial<ConfigCmd> };
+
+type ConfigCmd ={};
+
 // esp8622 module info 
 export type DeviceRemoteInfo = {
 	name: string;
@@ -55,7 +64,6 @@ export type DeviceRemoteWiFiInfo = {
 // Device Command types
 export type DeviceCmd<T> = {
     cmd: string;
-    error: string;
     data: T;
 };
 
@@ -66,6 +74,7 @@ export type TelemetryCmd = {
 	current: number;
 	temperature: number;
 	flow: boolean;
+	error: string;
 };
 
 export type StateCmd = {
@@ -83,16 +92,13 @@ export type StatusCmd = {
 	PumpType: string;
 };
 
-export type DeviceCmdPatch<T> =
+export type DeviceCmdPatch =
     | {
           cmd: "telemetry";
-          data: Partial<TelemetryCmd>;
       }
     | {
           cmd: "state";
-          data: Partial<StateCmd>;
       }
     | {
           cmd: "status";
-          data: Partial<StatusCmd>;
       };

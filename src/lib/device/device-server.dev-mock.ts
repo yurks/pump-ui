@@ -4,51 +4,79 @@ import type {
 	DeviceRemoteState,
 	DeviceCmd,
 	TelemetryCmd,
+	StateCmd,
+	StatusCmd,
 	DeviceCmdPatch
 } from '$lib/device/types';
 
 /*
-{"cmd":"status","error":"NO_ERRORS","data":{"hw_sw":{"soft":"SW: 2.60","hard":"HW: 2.0"},"PumpType":3}}
-{"cmd":"state","error":"NO_ERRORS","data":{"DryWorkStop":false,"PressureStop":false,"temp_stop":false,"user_stop":false}}
-{"cmd":"telemetry","error":"NO_ERRORS","data":{"freq":20,"voltage":219,"current":0.00,"pressure":0.17,"temperature":27,"flow":0}}
-
-{"cmd":"some_command","error":"ERROR","data":{payload}}
+{"cmd":"error","data":{"error":"NO_ERRORS"}
+{"cmd":"status","data":{"hw_sw":{"soft":"SW: 2.60","hard":"HW: 2.0"},"PumpType":3}}
+{"cmd":"state",""data":{"DryWorkStop":false,"PressureStop":false,"temp_stop":false,"user_stop":false}}
+{"cmd":"telemetry","data":{"freq":20,"voltage":219,"current":0.00,"pressure":0.17,"temperature":27,"flow":0,"error":"NO_ERRORS"}}
+{"cmd": "pump","data":{}}
 */
 
 export function createMockDeviceServer() {
-	let device: DeviceCmd<TelemetryCmd> = {
-		cmd: "",
-		error: "",
-		data: <TelemetryCmd> {
-			freqency: 40,
-			pressure: 1.4,
-			voltage: 213,
-			current: 4,
-			temperature: 21,
-			flow: true
-		}
-	};
+
+	let telemetry: TelemetryCmd = {
+        freqency: 20,
+        pressure: 1.4,
+        voltage: 220,
+        current: 5.5,
+        temperature: 25,
+        flow: true,
+		error: "NO_ERRORS"
+    };
+
+	let state: StateCmd = {
+        DryWorkStop: false,
+        PressureStop: false,
+        temp_stop: false,
+        user_stop: false
+    };
+
+    let status: StatusCmd = {
+        hw_sw: {
+            soft: "SW: 2.60",
+            hard: "HW: 2.0"
+        },
+        PumpType: "3"
+    };
 
 	function snapshot(): DeviceCmd<TelemetryCmd> {
-		return device;
+		return {
+				cmd: "telemetry",
+				data: telemetry
+		};
 	}
 
 	function tick(): void {
-		const nextTemp = Number((device.data.temperature + (Math.random() - 0.5) * 0.6).toFixed(1));
-		const nextVoltage = Number((device.data.voltage + (Math.random() - 0.5) * 10).toFixed());
-		const nextCurrent = Number((device.data.current + (Math.random() - 0.5) * 100).toFixed());
-		const nextPressure = Number((device.data.pressure + (Math.random() - 0.5) * 3).toFixed(1));
 
-		device = {
-			...device,
-			data: {
-				...device.data,
-				pressure: nextPressure,
-				voltage: nextVoltage,
-				current: nextCurrent,
-				temperature: nextTemp
-			},
-		};
+        telemetry = {
+            ...telemetry,
+            temperature: Number(
+                (telemetry.temperature + (Math.random() - 0.5) * 0.5).toFixed(1)
+            ),
+            pressure: Number(
+                (telemetry.pressure + (Math.random() - 0.5) * 0.2).toFixed(2)
+            ),
+            voltage: Math.round(
+                telemetry.voltage + (Math.random() - 0.5) * 4
+            ),
+            current: Number(
+                Math.max(
+                    0,
+                    telemetry.current + (Math.random() - 0.5) * 0.2
+                ).toFixed(2)
+            )
+        };
+
+        telemetry.flow = telemetry.pressure > 0.2;
+
+        state.PressureStop = telemetry.pressure > 5;
+        state.temp_stop = telemetry.temperature > 70;
+
 	}
 
 	function handle(message: DeviceClientMessage): DeviceServerMessage {
@@ -59,15 +87,36 @@ export function createMockDeviceServer() {
 					payload: { ts: Date.now() }
 				};
 
-			case 'cmd':
-				device = {
-					...device
-				};
+            case "cmd":
+                switch (message.payload.cmd) {
+                    case "telemetry":
+                        telemetry = {
+                            ...telemetry,
+                            ...message.payload.data
+                        };
 
-				return {
-					type: 'cmd_result',
-					payload: snapshot()
-				};
+                        return {
+                            type: "cmd_result",
+                            payload: {
+                                cmd: "telemetry",
+                                data: telemetry
+                            }
+                        };
+					case "status":
+                        status = {
+                            ...status,
+                            ...message.payload.data
+                        };
+
+                        return {
+                            type: "cmd_result",
+                            payload: {
+                                cmd: "status",
+                                data: status
+                            }
+                        };
+
+				}
 		}
 	}
 

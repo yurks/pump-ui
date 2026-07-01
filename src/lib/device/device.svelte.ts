@@ -17,4 +17,4 @@ export const device = createDeviceClient({
 });
 
 export const deviceState = device.state;
-export const deviceUpdate = device.update;
+export const deviceUpdate = device.update({cmd: "telemetry"});

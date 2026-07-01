@@ -211,7 +211,7 @@ export function createDeviceClient({
 		state.updating = false;
 	}
 
-	async function update<T>(controlsPatch: DeviceCmdPatch<T>): Promise<void> {
+	async function update<T>(controlsPatch: DeviceCmdPatch): Promise<void> {
 		if (pendingUpdate || state.updating) {
 			const message = 'Update already in progress';
 			setLastError(message);
