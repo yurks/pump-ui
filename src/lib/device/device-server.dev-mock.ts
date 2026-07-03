@@ -5,14 +5,6 @@ import type {
 	DeviceRemoteInfo
 } from '$lib/device/types';
 
-/*
-// {"cmd":"error","data":{"error":"NO_ERRORS"}
-{"cmd":"status","data":{"hw_sw":{"soft":"SW: 2.60","hard":"HW: 2.0"},"PumpType":3}}
-{"cmd":"state",""data":{"DryWorkStop":false,"PressureStop":false,"temp_stop":false,"user_stop":false}}
-{"cmd":"telemetry","data":{"freq":20,"voltage":219,"current":0.00,"pressure":0.17,"temperature":27,"flow":0,"error":"NO_ERRORS"}}
-{"cmd": "pump","data":{}}
-*/
-
 export function createMockDeviceServer() {
 	const deviceInfo: DeviceRemoteInfo = {
 		name: 'Mock Magnetik PSM-100',
