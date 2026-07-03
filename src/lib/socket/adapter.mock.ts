@@ -6,13 +6,11 @@ import { createMockDeviceServer } from '../device/device-server.dev-mock.ts';
 type MockSocketOptions = {
 	connectDelayMs?: number;
 	requestLatencyMs?: number;
-	telemetryIntervalMs?: number;
 };
 
 const options: MockSocketOptions = {
 	connectDelayMs: 300,
-	requestLatencyMs: 1000,
-	telemetryIntervalMs: 2000
+	requestLatencyMs: 1000
 };
 
 function createOpenEvent(): Event {
@@ -36,7 +34,6 @@ const server = createMockDeviceServer();
 export function createSocketAdapter(_url: string): SocketAdapter {
 	let closed = false;
 	let pendingRequests = 0;
-	let pushTimer: ReturnType<typeof setInterval> | null = null;
 	let openTimer: ReturnType<typeof setTimeout> | null = null;
 
 	const socket: SocketAdapter = {
@@ -72,8 +69,8 @@ export function createSocketAdapter(_url: string): SocketAdapter {
 						socket.onmessage?.(createMessageEvent(JSON.stringify(response)));
 					} catch {
 						const fallback: DeviceServerMessage = {
-							type: 'error',
-							payload: { message: 'Mock server failed to process message' }
+							cmd: 'error',
+							data: { message: 'Mock server failed to process message', code: -1 }
 						};
 
 						socket.onmessage?.(createMessageEvent(JSON.stringify(fallback)));
@@ -91,7 +88,6 @@ export function createSocketAdapter(_url: string): SocketAdapter {
 			socket.readyState = WebSocket.CLOSED;
 
 			if (openTimer) clearTimeout(openTimer);
-			if (pushTimer) clearInterval(pushTimer);
 
 			socket.onclose?.(createCloseEvent());
 		}
@@ -102,20 +98,6 @@ export function createSocketAdapter(_url: string): SocketAdapter {
 
 		socket.readyState = WebSocket.OPEN;
 		socket.onopen?.(createOpenEvent());
-
-		pushTimer = setInterval(() => {
-			if (closed || socket.readyState !== WebSocket.OPEN) return;
-			if (pendingRequests > 0) return;
-
-			server.tick();
-
-			const message: DeviceServerMessage = {
-				type: 'state',
-				payload: server.snapshot()
-			};
-
-			socket.onmessage?.(createMessageEvent(JSON.stringify(message)));
-		}, options.telemetryIntervalMs);
 	}, options.connectDelayMs);
 
 	return socket;

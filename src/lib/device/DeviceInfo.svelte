@@ -6,9 +6,16 @@
 	import { deviceState } from '$lib/device/device.svelte';
 	import DeviceControlFieldUpdateButton from '$lib/device/DeviceControlFieldUpdateButton.svelte';
 
-	const enabled = $derived(deviceState.data?.controls.enabled);
-	const flags = $derived(deviceState.data?.metrics.flags);
-	const info = $derived(deviceState.data?.info);
+	const error = $derived(deviceState.data?.error);
+	const info = $derived(deviceState.info);
+
+	const disabled = $derived.by(() => {
+		const state = deviceState.data?.status;
+		if (!state) {
+			return null;
+		}
+		return Object.values(state).some(Boolean);
+	});
 
 	const { class: className } = $props();
 </script>
@@ -22,14 +29,12 @@
 				<Avatar size="lg" src={favicon} />
 				<div>
 					<h5 class="text-xl font-medium">{info.name}</h5>
-					{#if info.firmware}
-						<p class="mt-1 text-xs opacity-70">{info.firmware}</p>
+					{#if info.firmware_sw || info.firmware_hw}
+						<p class="mt-1 text-xs opacity-70">{info.firmware_sw} {info.firmware_hw}</p>
 					{/if}
-					{#if flags?.length}
+					{#if error?.code}
 						<div class="mt-2 flex flex-wrap gap-2">
-							{#each flags as flag (flag)}
-								<Badge color="yellow" large>{flag}</Badge>
-							{/each}
+							<Badge color="yellow" large>{error.message}</Badge>
 						</div>
 					{/if}
 				</div>
@@ -38,11 +43,12 @@
 
 		<DeviceControlFieldUpdateButton
 			size="xl"
-			color={enabled ? 'red' : 'green'}
+			color={!disabled ? 'red' : 'green'}
 			class="md:w-3xs"
-			name="enabled"
-			value={!enabled}
-			label={enabled ? m.control_off() : m.control_on()}
+			name="toggle"
+			value={!!disabled}
+			disabled={disabled == null}
+			label={!disabled ? m.control_off() : m.control_on()}
 		/>
 	</div>
 </Card>

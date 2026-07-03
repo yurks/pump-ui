@@ -8,30 +8,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * Runtime validation for incoming WebSocket messages.
  * TypeScript does not protect data received over the network.
  */
-export function validateDeviceServerMessage(msg: unknown) {
-	if (!isRecord(msg) || !isRecord(msg.payload) || typeof msg.type !== 'string') {
+export function validateDeviceServerMessage(msg: DeviceServerMessage) {
+	if (!isRecord(msg) || !isRecord(msg.data) || typeof msg.cmd !== 'string') {
 		console.error('Invalid message received:', msg);
 		throw new Error(`Invalid message received`);
 	}
-
 	const value = msg as DeviceServerMessage;
 
 	if (
-		value.type === 'state' &&
-		isRecord(value.payload.info) &&
-		isRecord(value.payload.controls) &&
-		isRecord(value.payload.metrics)
+		value.cmd === 'pump:monitor' &&
+		isRecord(value.data.status) &&
+		isRecord(value.data.metrics) &&
+		isRecord(value.data.error)
 	) {
 		return;
 	}
 
-	if (value.type === 'pong' && typeof value.payload.ts === 'number') {
+	if (value.cmd === 'pump:toggle' || value.cmd === 'pump:update' || value.cmd === 'pump:info') {
 		return;
 	}
 
-	if (value.type === 'error' && typeof value.payload.message === 'string') {
+	if (value.cmd === 'error' && typeof value.data.message === 'string') {
 		return;
 	}
 
-	throw new Error(`Unknown message received (type: ${value.type})`);
+	throw new Error(`Unknown message received (cmd: ${value.cmd})`);
 }

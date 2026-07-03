@@ -1,51 +1,47 @@
 import type { SocketConnectorStatus } from '$lib/socket/types';
 
-type TimestampRecord = { ts: number };
-
 export type DeviceClient = {
 	socketStatus: SocketConnectorStatus;
 	lastError: string | null;
 	lastMessageAt: number | null;
-	data: DeviceRemoteState | null;
+	data: DeviceRemoteMonitor | null;
+	info: DeviceRemoteInfo | null;
+	controls: DeviceRemoteControls | null;
 	stale: boolean;
 	initializedAt: number | null;
 	updating: boolean;
 };
 
 export type DeviceClientMessage =
-	| {
-			type: 'update';
-			payload: { controls: Partial<DeviceRemoteControls> };
-	  }
-	| {
-			type: 'ping';
-			payload: TimestampRecord;
-	  };
+	| { cmd: 'pump:update'; data: { controls: Partial<DeviceRemoteControls> } }
+	| { cmd: 'pump:toggle' }
+	| { cmd: 'pump:monitor' }
+	| { cmd: 'pump:info' };
 
 export type DeviceServerMessage =
-	| {
-			type: 'state';
-			payload: DeviceRemoteState;
-	  }
-	| {
-			type: 'pong';
-			payload: TimestampRecord;
-	  }
-	| {
-			type: 'error';
-			payload: { message: string; code?: string };
-	  };
+	| { cmd: 'pump:update'; data: Record<string, unknown> }
+	| { cmd: 'pump:toggle'; data: Record<string, unknown> }
+	| { cmd: 'pump:monitor'; data: DeviceRemoteMonitor }
+	| { cmd: 'pump:info'; data: DeviceRemoteInfo }
+	| { cmd: 'error'; data: DeviceRemoteError };
 
-export type DeviceRemoteMetrics = {
-	flags: string[];
-	pressure: number;
+export type DeviceRemoteMonitorMetrics = {
 	voltage: number;
 	current: number;
+	frequency: number;
+	pressure: number;
 	temperature: number;
+	flow: number;
+};
+
+export type DeviceRemoteMonitorStatus = {
+	DryWorkStop: boolean;
+	PressureStop: boolean;
+	temp_stop: boolean;
+	user_stop: boolean;
 };
 
 export type DeviceRemoteControls = {
-	enabled: boolean;
 	pressure_limit: number;
 	temp_limit: number;
 	mode: 'auto' | 'manual';
@@ -53,11 +49,18 @@ export type DeviceRemoteControls = {
 
 export type DeviceRemoteInfo = {
 	name: string;
-	firmware: string;
+	firmware_hw: string;
+	firmware_sw: string;
+	type: number;
 };
 
-export type DeviceRemoteState = {
-	info: DeviceRemoteInfo;
-	metrics: DeviceRemoteMetrics;
-	controls: DeviceRemoteControls;
-} & TimestampRecord;
+export type DeviceRemoteError = {
+	message: string;
+	code: number;
+};
+
+export type DeviceRemoteMonitor = {
+	metrics: DeviceRemoteMonitorMetrics;
+	status: DeviceRemoteMonitorStatus;
+	error: DeviceRemoteError;
+};

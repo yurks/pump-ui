@@ -1,11 +1,16 @@
 import { createSocketConnector } from '$lib/socket/connector';
 import { validateDeviceServerMessage } from '$lib/device/validations';
+import {
+	DEVICE_DEFAULT_STALE_DATA_AFTER_MS,
+	DEVICE_DEFAULT_UPDATE_TIMEOUT_MS,
+	DEVICE_STALE_CHECK_INTERVAL_MS
+} from '$lib/device/config';
 
 import {
 	type DeviceClient,
 	type DeviceClientMessage,
 	type DeviceRemoteControls,
-	type DeviceRemoteState,
+	type DeviceRemoteMonitor,
 	type DeviceServerMessage
 } from './types.ts';
 
@@ -31,19 +36,17 @@ type PendingUpdate = {
 	reject: (error: Error) => void;
 };
 
-const STALE_CHECK_INTERVAL_MS = 1000;
-const DEFAULT_STALE_DATA_AFTER_MS = 5_000;
-const DEFAULT_UPDATE_TIMEOUT_MS = 5_000;
-
 export function createDeviceClient({
 	url,
-	staleDataAfterMs = DEFAULT_STALE_DATA_AFTER_MS,
-	updateTimeoutMs = DEFAULT_UPDATE_TIMEOUT_MS,
+	staleDataAfterMs = DEVICE_DEFAULT_STALE_DATA_AFTER_MS,
+	updateTimeoutMs = DEVICE_DEFAULT_UPDATE_TIMEOUT_MS,
 	debug = false
 }: DeviceClientOptions) {
 	const state = $state<DeviceClient>({
 		socketStatus: 'disconnected',
 		data: null,
+		info: null,
+		controls: null,
 		stale: true,
 		lastError: null,
 		lastMessageAt: null,
@@ -62,10 +65,7 @@ export function createDeviceClient({
 			backoffMultiplier: 1.2
 		},
 		heartbeat: {
-			createPingMessage: () => ({
-				type: 'ping',
-				payload: { ts: Date.now() }
-			})
+			command: { cmd: 'pump:monitor' }
 		}
 	});
 
@@ -89,7 +89,7 @@ export function createDeviceClient({
 		state.stale = ageMs > staleDataAfterMs;
 	}
 
-	function applyRemoteState(nextState: DeviceRemoteState) {
+	function applyRemoteState(nextState: DeviceRemoteMonitor) {
 		// We deliberately use local receipt time, not payload.ts.
 		// Remote clocks drift. Humans also drift, but usually with worse excuses.
 		state.data = nextState;
@@ -109,18 +109,15 @@ export function createDeviceClient({
 		return current;
 	}
 
-	function resolvePendingUpdate() {
-		clearPendingUpdate()?.resolve();
-	}
-
 	function rejectPendingUpdate(message: string) {
 		setLastError(message);
 		clearPendingUpdate()?.reject(new Error(message));
+		connector.startHeartbeat();
 	}
 
 	function startStaleCheckTimer() {
 		stopStaleCheckTimer();
-		staleCheckTimer = setInterval(refreshStaleFlag, STALE_CHECK_INTERVAL_MS);
+		staleCheckTimer = setInterval(refreshStaleFlag, DEVICE_STALE_CHECK_INTERVAL_MS);
 	}
 
 	function stopStaleCheckTimer() {
@@ -159,23 +156,23 @@ export function createDeviceClient({
 		});
 
 		unsubscribeMessage = connector.onMessage((message) => {
-			switch (message.type) {
-				case 'state': {
-					applyRemoteState(message.payload);
-					resolvePendingUpdate();
+			switch (message.cmd) {
+				case 'pump:monitor': {
+					applyRemoteState(message.data);
+					clearPendingUpdate()?.resolve();
 					break;
 				}
 
-				case 'pong': {
-					// Heartbeat was answered, so transport is alive.
-					// We do not touch lastMessageAt here because metrics freshness and
-					// socket liveness are different concepts.
-					setLastError(null);
+				case 'pump:info': {
+					state.info = message.data;
 					break;
 				}
 
-				case 'error': {
-					rejectPendingUpdate(message.payload.message);
+				case 'pump:toggle':
+				case 'pump:update': {
+					if (pendingUpdate) {
+						connector.startHeartbeat();
+					}
 					break;
 				}
 			}
@@ -183,6 +180,7 @@ export function createDeviceClient({
 
 		startStaleCheckTimer();
 		connector.connect();
+		connector.send({ cmd: 'pump:info' });
 	}
 
 	function destroy() {
@@ -207,7 +205,7 @@ export function createDeviceClient({
 		state.updating = false;
 	}
 
-	async function update(controlsPatch: Partial<DeviceRemoteControls>): Promise<void> {
+	async function update(controlsPatch: Partial<DeviceRemoteControls> | 'toggle'): Promise<void> {
 		if (pendingUpdate || state.updating) {
 			const message = 'Update already in progress';
 			setLastError(message);
@@ -235,10 +233,12 @@ export function createDeviceClient({
 			};
 
 			try {
-				connector.send({
-					type: 'update',
-					payload: { controls: controlsPatch }
-				});
+				connector.stopHeartbeat();
+				if (controlsPatch === 'toggle') {
+					connector.send({ cmd: 'pump:toggle' });
+				} else {
+					connector.send({ cmd: 'pump:update', data: { controls: controlsPatch } });
+				}
 			} catch (error) {
 				const message = error instanceof Error ? error.message : 'Failed to send update';
 				rejectPendingUpdate(message);

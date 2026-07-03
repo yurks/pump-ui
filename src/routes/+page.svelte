@@ -4,8 +4,8 @@
 	import DeviceInfo from '$lib/device/DeviceInfo.svelte';
 </script>
 
-<div class="grid grid-cols-2 gap-4 md:grid-cols-4">
-	<DeviceInfo class="col-start-1 col-end-3 md:col-end-5" />
+<div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
+	<DeviceInfo class="col-start-1 col-end-3 md:col-end-4 lg:col-end-7" />
 	<DeviceMetrics />
 </div>
 

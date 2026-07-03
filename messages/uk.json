@@ -7,6 +7,8 @@
 	"pressure": "Тиск",
 	"voltage": "Напруга",
 	"current": "Струм",
+	"frequency": "Частота",
+	"flow": "Потік",
 	"temperature": "Температура",
 	"time_seconds": "{value}c",
 	"time_minutes": "{value}хв",

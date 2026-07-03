@@ -6,8 +6,7 @@
 	import { deviceState, deviceUpdate } from '$lib/device/device.svelte';
 	import AppSpinner from '$lib/AppSpinner.svelte';
 
-	const controls = $derived(deviceState.data?.controls);
-
+	const controls = $derived(deviceState.controls);
 	let {
 		label,
 		name,
@@ -15,18 +14,28 @@
 		onDone,
 		class: className,
 		color,
-		size
+		size,
+		disabled
 	}: {
 		label: string;
-		name: keyof DeviceRemoteControls;
-		value: number | string | boolean;
+		name: keyof DeviceRemoteControls | 'toggle';
+		value: number | string | boolean | readonly string[] | readonly number[];
 		onDone?: () => void;
 		class?: ClassValue;
 		color?: ButtonProps['color'];
 		size?: ButtonProps['size'];
+		disabled?: boolean | null;
 	} = $props();
 
+	const isDisabled = $derived(typeof disabled === 'boolean' ? disabled : controls == null);
+
 	async function update() {
+		if (name === 'toggle') {
+			await deviceUpdate('toggle').catch();
+			onDone?.();
+			return;
+		}
+
 		if (!controls || controls[name] === value) {
 			onDone?.();
 			return;
@@ -40,13 +49,13 @@
 <Button
 	class={`${className} w-full`}
 	{size}
-	color={controls == null ? 'gray' : color}
-	disabled={controls == null || deviceState.updating}
+	color={isDisabled ? 'gray' : color}
+	disabled={isDisabled || deviceState.updating}
 	onclick={update}
 >
 	{#if deviceState.updating}
 		<AppSpinner size="6" />
-	{:else if controls}
+	{:else if !isDisabled}
 		{label}
 	{/if}
 </Button>

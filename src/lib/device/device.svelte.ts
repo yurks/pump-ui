@@ -8,7 +8,7 @@ function getWsUrl() {
 	}
 
 	const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-	return `${protocol}//${location.host}/ws/device`;
+	return `${protocol}//${location.host}:81`;
 }
 
 export const device = createDeviceClient({

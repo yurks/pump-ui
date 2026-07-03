@@ -7,6 +7,8 @@
 	"pressure": "Pressure",
 	"voltage": "Voltage",
 	"current": "Current",
+	"frequency": "Frequency",
+	"flow": "Flow",
 	"temperature": "Temperature",
 	"time_seconds": "{value}s",
 	"time_minutes": "{value}m",
@@ -20,9 +22,7 @@
 	"field_label__pressure_limit": "Pressure limit",
 	"field_label__temp_limit": "Temperature limit",
 	"field_label__mode": "Mode",
-	"field_label__enabled": "",
 	"field_desc__pressure_limit": "(0.5 – 10 atm)",
 	"field_desc__temp_limit": "",
-	"field_desc__mode": "",
-	"field_desc__enabled": ""
+	"field_desc__mode": ""
 }

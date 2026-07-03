@@ -1,5 +1,14 @@
 import type { SocketAdapter, SocketConnectorStatus } from '$lib/socket/types';
 import { createSocketAdapter } from '$lib/socket/adapter';
+import {
+	SOCKET_COMMANDS_QUEUE_MAX_SIZE,
+	SOCKET_CONNECTION_HEARTBEAT_INTERVAL_MS,
+	SOCKET_CONNECTION_HEARTBEAT_TIMEOUT_MS,
+	SOCKET_DEFAULT_CONNECTION_TIMEOUT_MS,
+	SOCKET_DEFAULT_RECONNECTION_BACKOFF_MULTIPLIER,
+	SOCKET_DEFAULT_RECONNECTION_INITIAL_DELAY_MS,
+	SOCKET_DEFAULT_RECONNECTION_MAX_DELAY_MS
+} from '$lib/socket/config';
 
 import { browser } from '$app/environment';
 
@@ -8,7 +17,7 @@ type Listener<T> = (value: T) => void;
 type SocketConnectorOptions<TIncoming, TOutgoing> = {
 	url: string;
 	parse?: (raw: string) => TIncoming;
-	validateIncoming?: (value: unknown) => void;
+	validateIncoming?: (value: TIncoming) => void;
 	serialize?: (message: TOutgoing) => string;
 	onOpen?: () => void;
 	connectTimeoutMs?: number;
@@ -20,7 +29,7 @@ type SocketConnectorOptions<TIncoming, TOutgoing> = {
 	heartbeat?: {
 		intervalMs?: number;
 		timeoutMs?: number;
-		createPingMessage?: () => TOutgoing;
+		command?: TOutgoing;
 	};
 	queue?: {
 		maxSize?: number;
@@ -29,27 +38,32 @@ type SocketConnectorOptions<TIncoming, TOutgoing> = {
 	createSocket?: (url: string) => SocketAdapter;
 };
 
-export function createSocketConnector<TIncoming, TOutgoing>({
+export function createSocketConnector<
+	TIncoming extends { cmd: string },
+	TOutgoing extends { cmd: string }
+>({
 	url,
 	parse = (raw) => JSON.parse(raw) as TIncoming,
 	validateIncoming,
 	serialize = (message) => JSON.stringify(message),
 	onOpen,
-	connectTimeoutMs = 8000,
+	connectTimeoutMs = SOCKET_DEFAULT_CONNECTION_TIMEOUT_MS,
 	reconnect = {},
 	heartbeat = {},
 	queue = {},
 	debug = false,
 	createSocket
 }: SocketConnectorOptions<TIncoming, TOutgoing>) {
-	const reconnectInitialDelayMs = reconnect.initialDelayMs ?? 1000;
-	const reconnectMaxDelayMs = reconnect.maxDelayMs ?? 15000;
-	const reconnectBackoffMultiplier = reconnect.backoffMultiplier ?? 1.8;
+	const reconnectInitialDelayMs =
+		reconnect.initialDelayMs ?? SOCKET_DEFAULT_RECONNECTION_INITIAL_DELAY_MS;
+	const reconnectMaxDelayMs = reconnect.maxDelayMs ?? SOCKET_DEFAULT_RECONNECTION_MAX_DELAY_MS;
+	const reconnectBackoffMultiplier =
+		reconnect.backoffMultiplier ?? SOCKET_DEFAULT_RECONNECTION_BACKOFF_MULTIPLIER;
 
-	const heartbeatIntervalMs = heartbeat.intervalMs ?? 5000;
-	const heartbeatTimeoutMs = heartbeat.timeoutMs ?? 3000;
+	const heartbeatIntervalMs = heartbeat.intervalMs ?? SOCKET_CONNECTION_HEARTBEAT_INTERVAL_MS;
+	const heartbeatTimeoutMs = heartbeat.timeoutMs ?? SOCKET_CONNECTION_HEARTBEAT_TIMEOUT_MS;
 
-	const queueMaxSize = queue.maxSize ?? 100;
+	const queueMaxSize = queue.maxSize ?? SOCKET_COMMANDS_QUEUE_MAX_SIZE;
 
 	const createSocketImpl = createSocket ?? createSocketAdapter;
 
@@ -60,6 +74,7 @@ export function createSocketConnector<TIncoming, TOutgoing>({
 
 	let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 	let connectTimeout: ReturnType<typeof setTimeout> | null = null;
+	let heartbeatActive = false;
 	let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 	let heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -101,9 +116,10 @@ export function createSocketConnector<TIncoming, TOutgoing>({
 		}
 	}
 
-	function clearHeartbeat() {
+	function stopHeartbeat() {
+		heartbeatActive = false;
 		if (heartbeatInterval) {
-			clearInterval(heartbeatInterval);
+			clearTimeout(heartbeatInterval);
 			heartbeatInterval = null;
 		}
 
@@ -163,21 +179,29 @@ export function createSocketConnector<TIncoming, TOutgoing>({
 		reconnectTimer = setTimeout(connect, delay);
 	}
 
-	function startHeartbeat() {
-		if (!heartbeat.createPingMessage) {
+	function startHeartbeat(withTimeout = false) {
+		if (!heartbeat.command) {
 			return;
 		}
 
-		heartbeatInterval = setInterval(() => {
+		heartbeatActive = true;
+
+		const ping = () => {
 			if (!isOpen()) return;
 
 			try {
-				socket!.send(serialize(heartbeat.createPingMessage!()));
+				socket!.send(serialize(heartbeat.command!));
 				resetHeartbeatTimeout();
 			} catch (error) {
 				emitError(error);
 			}
-		}, heartbeatIntervalMs);
+		};
+
+		if (withTimeout) {
+			heartbeatInterval = setTimeout(ping, heartbeatIntervalMs);
+		} else {
+			ping();
+		}
 	}
 
 	function connect() {
@@ -228,10 +252,13 @@ export function createSocketConnector<TIncoming, TOutgoing>({
 			try {
 				const message = parse(String(event.data));
 				validateIncoming?.(message);
-
 				// Any incoming message means the connection is alive
-				if (heartbeat.createPingMessage) {
+				if (heartbeat.command?.cmd === message.cmd) {
+					if (!heartbeatActive) {
+						return;
+					}
 					resetHeartbeatTimeout();
+					startHeartbeat(true);
 				}
 
 				for (const listener of messageListeners) {
@@ -252,7 +279,7 @@ export function createSocketConnector<TIncoming, TOutgoing>({
 
 			clearConnectTimeout();
 			clearReconnectTimer();
-			clearHeartbeat();
+			stopHeartbeat();
 
 			setStatus('disconnected');
 
@@ -267,7 +294,7 @@ export function createSocketConnector<TIncoming, TOutgoing>({
 
 		clearReconnectTimer();
 		clearConnectTimeout();
-		clearHeartbeat();
+		stopHeartbeat();
 
 		if (socket) {
 			socket.close();
@@ -308,6 +335,8 @@ export function createSocketConnector<TIncoming, TOutgoing>({
 	}
 
 	return {
+		startHeartbeat,
+		stopHeartbeat,
 		connect,
 		disconnect,
 		send,
