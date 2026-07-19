@@ -12,16 +12,44 @@ export type DeviceClient = {
 	updating: boolean;
 };
 
+// A config parameter's value is always a number or text.
+// Booleans are encoded as 0/1.
+export type DeviceConfigValue = number | string;
+
 export type DeviceSetParam = {
 	name: string;
-	value: number | string | boolean;
+	value: DeviceConfigValue;
+};
+
+// A parameter is either a free numeric/text value or a bounded/enumerated one.
+// Booleans are represented as numeric 0/1, never as a real boolean.
+export type DeviceConfigParamType = 'number' | 'text';
+
+// A selectable option for enumerated params (e.g. Auto/Manual/Off).
+export type DeviceConfigParamOptionItem = {
+	id: number;
+	value: string;
+};
+
+// Constraints / choices for a param. Every field is optional.
+export type DeviceConfigParamOptions = {
+	min?: number;
+	max?: number;
+	step?: number;
+	items?: DeviceConfigParamOptionItem[];
 };
 
 // A single configuration parameter. `value` is absent in listings
 // (pump:config_list) and present when reading values (pump:config_get).
+// `label`, `measure`, `multiplier` and `options` are optional metadata.
 export type DeviceConfigParam = {
 	name: string;
-	value?: string;
+	value?: DeviceConfigValue;
+	label?: string;
+	type?: DeviceConfigParamType;
+	measure?: string;
+	multiplier?: number;
+	options?: DeviceConfigParamOptions;
 };
 
 export type DeviceClientMessage =

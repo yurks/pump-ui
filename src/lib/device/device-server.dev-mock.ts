@@ -1,6 +1,7 @@
 import type {
 	DeviceClientMessage,
 	DeviceServerMessage,
+	DeviceConfigParam,
 	DeviceRemoteMonitor,
 	DeviceRemoteInfo
 } from '$lib/device/types';
@@ -32,18 +33,100 @@ export function createMockDeviceServer() {
 		error: { message: 'NO_ERROR', code: 0 }
 	};
 
-	const config: Record<string, string> = {
-		MAX_PRESSURE: '30',
-		DELTA_PSTART: '10',
-		PRESSURE_DRY: '5',
-		I_LIMIT: '8',
-		FREQ_SPEED_CHANGE: '45',
-		FLOW_SENSOR: '1',
-		ROTATE: '0',
-		PRESSURE_DELAY: '3',
-		DRY_MODE: '1',
-		DELAY_AFTER_DRY_START: '20',
-		NUM_REBUTS_FOR_DRY_START: '3'
+	// Full parameter metadata keyed by name. `value` is always number or text;
+	// booleans are encoded as 0/1. `label`, `measure`, `multiplier` and
+	// `options` (and every field inside `options`) are optional.
+	const config: Record<string, Omit<DeviceConfigParam, 'name'>> = {
+		MAX_PRESSURE: {
+			value: 30,
+			label: 'Max pressure',
+			type: 'number',
+			measure: 'atm',
+			multiplier: 10,
+			options: { min: 10, max: 80, step: 1 }
+		},
+		DELTA_PSTART: {
+			value: 10,
+			label: 'Start delta',
+			type: 'number',
+			measure: 'atm',
+			options: { min: 1, max: 30, step: 1 }
+		},
+		PRESSURE_DRY: {
+			value: 5,
+			label: 'Dry-run pressure',
+			type: 'number',
+			measure: 'atm',
+			options: { min: 0, max: 20 }
+		},
+		I_LIMIT: {
+			value: 8,
+			label: 'Current limit',
+			type: 'number',
+			measure: 'A',
+			options: { min: 0, max: 16, step: 1 }
+		},
+		FREQ_SPEED_CHANGE: {
+			value: 45,
+			label: 'Speed change frequency',
+			type: 'number',
+			measure: 'Hz',
+			options: { min: 30, max: 60 }
+		},
+		FLOW_SENSOR: {
+			value: 1,
+			label: 'Flow sensor',
+			type: 'number',
+			options: {
+				items: [
+					{ id: 0, value: 'Off' },
+					{ id: 1, value: 'On' }
+				]
+			}
+		},
+		ROTATE: {
+			value: 0,
+			label: 'Rotation',
+			type: 'number',
+			options: {
+				items: [
+					{ id: 0, value: 'Normal' },
+					{ id: 1, value: 'Reversed' }
+				]
+			}
+		},
+		PRESSURE_DELAY: {
+			value: 3,
+			label: 'Pressure delay',
+			type: 'number',
+			measure: 's',
+			options: { min: 0, max: 60 }
+		},
+		DRY_MODE: {
+			value: 1,
+			label: 'Dry-run mode',
+			type: 'number',
+			options: {
+				items: [
+					{ id: 0, value: 'Auto' },
+					{ id: 1, value: 'Manual' },
+					{ id: 2, value: 'Off' }
+				]
+			}
+		},
+		DELAY_AFTER_DRY_START: {
+			value: 20,
+			label: 'Delay after dry start',
+			type: 'number',
+			measure: 's',
+			options: { min: 0, max: 120 }
+		},
+		NUM_REBUTS_FOR_DRY_START: {
+			value: 3,
+			label: 'Retries before dry start',
+			type: 'number',
+			options: { min: 0, max: 10, step: 1 }
+		}
 	};
 
 	function snapshot(): DeviceRemoteMonitor {
@@ -96,16 +179,21 @@ export function createMockDeviceServer() {
 			case 'pump:config_get':
 				return {
 					cmd: 'pump:config_get',
-					data: message.data.map(({ name }) => ({ name, value: config[name] }))
+					data: message.data
+						.filter(({ name }) => config[name])
+						.map(({ name }) => ({ name, ...config[name] }))
 				};
 
 			case 'pump:config_set':
 				return {
 					cmd: 'pump:config_set',
-					data: message.data.map((param) => {
-						config[param.name] = String(param.value);
-						return param.name;
-					})
+					data: message.data
+						.filter((param) => config[param.name])
+						.map((param) => {
+							// Value is always number or text; booleans arrive as 0/1.
+							config[param.name].value = param.value;
+							return param.name;
+						})
 				};
 
 			case 'pump:toggle':
