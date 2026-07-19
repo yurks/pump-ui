@@ -10,6 +10,7 @@ import {
 import {
 	type DeviceClient,
 	type DeviceClientMessage,
+	type DeviceConfigParam,
 	type DeviceRemoteControls,
 	type DeviceRemoteMonitor,
 	type DeviceServerMessage,
@@ -106,6 +107,34 @@ export function createDeviceClient({
 		state.lastMessageAt = Date.now();
 		setLastError(null);
 		refreshStaleFlag();
+	}
+
+	// Config values are read one param at a time via pump:config_get. The list
+	// of params (names only) arrives up front from pump:config_list.
+	function requestConfigValues(names: string[]) {
+		for (const name of names) {
+			try {
+				connector.send({ cmd: 'pump:config_get', data: [{ name }] });
+			} catch {
+				// Not connected right now; the status listener drives recovery.
+			}
+		}
+	}
+
+	// Merge freshly read values into the known params without dropping the
+	// list order we got from pump:config_list.
+	function applyConfigValues(params: DeviceConfigParam[]) {
+		const controls = state.controls;
+		if (!controls) return;
+
+		for (const param of params) {
+			const existing = controls.find((c) => c.name === param.name);
+			if (existing) {
+				existing.value = param.value;
+			} else {
+				controls.push({ ...param });
+			}
+		}
 	}
 
 	function clearPendingUpdate() {
@@ -210,6 +239,13 @@ export function createDeviceClient({
 
 				case 'pump:config_list': {
 					state.controls = message.data;
+					// Fetch the current value for every listed param.
+					requestConfigValues(message.data.map((param) => param.name));
+					break;
+				}
+
+				case 'pump:config_get': {
+					applyConfigValues(message.data);
 					break;
 				}
 
@@ -228,6 +264,8 @@ export function createDeviceClient({
 					// atomic and completes on its own response. We do not wait for
 					// the next telemetry snapshot to consider it done.
 					clearPendingUpdate()?.resolve();
+					// Re-read the values the device reports as updated.
+					requestConfigValues(message.data);
 					break;
 				}
 			}
