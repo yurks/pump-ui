@@ -208,7 +208,18 @@ export function createMockDeviceServer() {
 						.map(({ name }) => ({ name, ...config[name] }))
 				};
 
-			case 'pump:config_set':
+			case 'pump:config_set': {
+				// Simulate a device that refuses to write the first field, so the
+				// UI's root-level `error` handling can be exercised in dev.
+				const firstField = Object.keys(config)[0];
+				if (message.data.some((param) => param.name === firstField)) {
+					return {
+						cmd: 'pump:config_set',
+						data: [],
+						error: `Device rejected write to "${firstField}"`
+					};
+				}
+
 				return {
 					cmd: 'pump:config_set',
 					data: message.data
@@ -219,6 +230,7 @@ export function createMockDeviceServer() {
 							return param.name;
 						})
 				};
+			}
 
 			case 'pump:toggle':
 				device.status.motor_current_state = device.status.motor_current_state ? 0 : 1;

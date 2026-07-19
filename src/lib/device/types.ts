@@ -62,13 +62,16 @@ export type DeviceClientMessage =
 	| { cmd: 'ping' };
 
 export type DeviceServerMessage =
-	| { cmd: 'pump:config_set'; data: string[] }
+	// Command responses may carry a root-level `error` string. When present the
+	// command failed and the message is surfaced transiently (see showError).
+	| { cmd: 'pump:config_set'; data: string[]; error?: string }
 	| { cmd: 'pump:config_get'; data: DeviceConfigParam[] }
 	| { cmd: 'pump:config_list'; data: DeviceConfigParam[] }
-	| { cmd: 'pump:toggle'; data: { motor_current_state: number } }
+	| { cmd: 'pump:toggle'; data: { motor_current_state: number }; error?: string }
 	| { cmd: 'pump:monitor'; data: DeviceRemoteMonitor }
 	| { cmd: 'pump:info'; data: DeviceRemoteInfo }
 	| { cmd: 'pong' }
+	// Unsolicited/unexpected problem not tied to a specific request.
 	| { cmd: 'error'; data: DeviceRemoteError };
 
 export type DeviceRemoteMonitorMetrics = {

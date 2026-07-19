@@ -4,6 +4,7 @@ import {
 	DEVICE_DEFAULT_STALE_DATA_AFTER_MS,
 	DEVICE_DEFAULT_TELEMETRY_POLL_INTERVAL_MS,
 	DEVICE_DEFAULT_UPDATE_TIMEOUT_MS,
+	DEVICE_ERROR_DISPLAY_MS,
 	DEVICE_STALE_CHECK_INTERVAL_MS
 } from '$lib/device/config';
 
@@ -84,10 +85,31 @@ export function createDeviceClient({
 	let unsubscribeError: (() => void) | null = null;
 	let staleCheckTimer: ReturnType<typeof setInterval> | null = null;
 	let telemetryTimer: ReturnType<typeof setInterval> | null = null;
+	let errorClearTimer: ReturnType<typeof setTimeout> | null = null;
 	let pendingUpdate: PendingUpdate | null = null;
 
+	function clearErrorTimer() {
+		if (!errorClearTimer) return;
+
+		clearTimeout(errorClearTimer);
+		errorClearTimer = null;
+	}
+
 	function setLastError(message: string | null) {
+		clearErrorTimer();
 		state.lastError = message;
+	}
+
+	// Show an error briefly, then auto-clear it. Used for one-off device errors
+	// (the `error` command and command-level failures) that are not tied to the
+	// ongoing connection state, so they should not linger on screen forever.
+	function showError(message: string) {
+		clearErrorTimer();
+		state.lastError = message;
+		errorClearTimer = setTimeout(() => {
+			state.lastError = null;
+			errorClearTimer = null;
+		}, DEVICE_ERROR_DISPLAY_MS);
 	}
 
 	function refreshStaleFlag() {
@@ -105,7 +127,11 @@ export function createDeviceClient({
 		// Remote clocks drift. Humans also drift, but usually with worse excuses.
 		state.data = nextState;
 		state.lastMessageAt = Date.now();
-		setLastError(null);
+		// Healthy telemetry clears a lingering connection error, but never stomps
+		// a transient device error that is still counting down its display timer.
+		if (!errorClearTimer) {
+			setLastError(null);
+		}
 		refreshStaleFlag();
 	}
 
@@ -150,7 +176,7 @@ export function createDeviceClient({
 	}
 
 	function rejectPendingUpdate(message: string) {
-		setLastError(message);
+		showError(message);
 		clearPendingUpdate()?.reject(new Error(message));
 	}
 
@@ -251,6 +277,12 @@ export function createDeviceClient({
 				}
 
 				case 'pump:toggle': {
+					// A root-level error means the toggle was refused; fail fast
+					// instead of waiting for the update to time out.
+					if (message.error) {
+						rejectPendingUpdate(message.error);
+						break;
+					}
 					// Toggle replies with the fresh motor state, so we reflect it
 					// immediately instead of waiting for the next telemetry snapshot.
 					if (state.data) {
@@ -261,12 +293,25 @@ export function createDeviceClient({
 				}
 
 				case 'pump:config_set': {
+					// A root-level error means the write was rejected; fail fast
+					// instead of waiting for the update to time out.
+					if (message.error) {
+						rejectPendingUpdate(message.error);
+						break;
+					}
 					// Authoritative ack for our in-flight update: an update is
 					// atomic and completes on its own response. We do not wait for
 					// the next telemetry snapshot to consider it done.
 					clearPendingUpdate()?.resolve();
 					// Re-read the values the device reports as updated.
 					requestConfigValues(message.data);
+					break;
+				}
+
+				case 'error': {
+					// Unsolicited/unexpected problem, not tied to a request. Just
+					// surface it transiently.
+					showError(message.data.message);
 					break;
 				}
 			}
@@ -292,6 +337,7 @@ export function createDeviceClient({
 
 		stopStaleCheckTimer();
 		stopTelemetryPoll();
+		clearErrorTimer();
 		connector.disconnect();
 
 		state.initializedAt = null;

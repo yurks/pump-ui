@@ -156,9 +156,9 @@ Examples:
 | `pump:monitor` | `DeviceRemoteMonitor` | Telemetry snapshot: metrics + status + error. |
 | `pump:config_list` | `DeviceConfigParam[]` | Available params. **Names only** — no `value`; metadata optional. |
 | `pump:config_get` | `DeviceConfigParam[]` | Full param objects **with `value`** and metadata. |
-| `pump:config_set` | `string[]` | Ack: names of the params that were actually applied. |
-| `pump:toggle` | `{ motor_current_state: number }` | New motor state after toggle (0/1). |
-| `error` | `DeviceRemoteError` | Error report (`{ message, code }`). |
+| `pump:config_set` | `string[]` (+ optional root `error`) | Ack: names of the params that were actually applied. On failure, include a root-level `error` string. |
+| `pump:toggle` | `{ motor_current_state: number }` (+ optional root `error`) | New motor state after toggle (0/1). On failure, include a root-level `error` string. |
+| `error` | `DeviceRemoteError` | Unsolicited/unexpected error report (`{ message, code }`), not tied to a specific request. |
 
 > Notes for device authors:
 > - `pump:config_set` returns **only names**, not values. The client then re-reads those
@@ -168,6 +168,16 @@ Examples:
 >   `pump:config_get`.
 > - `pump:toggle` replies with the fresh `motor_current_state` so the UI can reflect it
 >   without waiting for the next telemetry poll.
+> - **Command failures:** `pump:config_set` and `pump:toggle` may carry a **root-level
+>   `error` string** (alongside or instead of their normal `data`). When present, the
+>   client fails the in-flight update immediately (instead of waiting for the update
+>   timeout) and shows the message briefly (`DEVICE_ERROR_DISPLAY_MS`, ~5s) before it
+>   auto-clears — it does **not** treat the command as successful.
+> - The standalone **`error`** command is for asynchronous/unexpected problems that are
+>   not the response to any request; the client simply displays its `message` transiently.
+> - Don't confuse either of the above with the `error` field **inside** a `pump:monitor`
+>   snapshot (`DeviceRemoteError`), which reports the device's ongoing operating-error
+>   state (e.g. `OVER_VOLT`) and is shown persistently until it clears.
 
 ### Shared payload shapes
 
@@ -301,6 +311,7 @@ Device client (`src/lib/device/config.ts`):
 | `DEVICE_DEFAULT_STALE_DATA_AFTER_MS` | `5000` | Telemetry older than this marks state `stale`. |
 | `DEVICE_STALE_CHECK_INTERVAL_MS` | `1000` | How often staleness is re-evaluated. |
 | `DEVICE_DEFAULT_UPDATE_TIMEOUT_MS` | `5000` | How long an `update()` waits for its ack before failing. |
+| `DEVICE_ERROR_DISPLAY_MS` | `5000` | How long a one-off/transient error message is shown before auto-clearing. |
 
 Transport (`src/lib/socket/config.ts`):
 
