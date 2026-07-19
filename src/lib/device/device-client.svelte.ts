@@ -2,6 +2,7 @@ import { createSocketConnector } from '$lib/socket/connector';
 import { validateDeviceServerMessage } from '$lib/device/validations';
 import {
 	DEVICE_DEFAULT_STALE_DATA_AFTER_MS,
+	DEVICE_DEFAULT_TELEMETRY_POLL_INTERVAL_MS,
 	DEVICE_DEFAULT_UPDATE_TIMEOUT_MS,
 	DEVICE_STALE_CHECK_INTERVAL_MS
 } from '$lib/device/config';
@@ -26,6 +27,9 @@ type DeviceClientOptions = {
 	// How long we wait for the next authoritative server response after update().
 	updateTimeoutMs?: number;
 
+	// How often we poll the device for a fresh telemetry snapshot.
+	pollIntervalMs?: number;
+
 	// Connector debug logs.
 	debug?: boolean;
 };
@@ -40,6 +44,7 @@ export function createDeviceClient({
 	url,
 	staleDataAfterMs = DEVICE_DEFAULT_STALE_DATA_AFTER_MS,
 	updateTimeoutMs = DEVICE_DEFAULT_UPDATE_TIMEOUT_MS,
+	pollIntervalMs = DEVICE_DEFAULT_TELEMETRY_POLL_INTERVAL_MS,
 	debug = false
 }: DeviceClientOptions) {
 	const state = $state<DeviceClient>({
@@ -65,7 +70,10 @@ export function createDeviceClient({
 			backoffMultiplier: 1.2
 		},
 		heartbeat: {
-			command: { cmd: 'pump:monitor' }
+			// Transport-level liveness only. Kept separate from telemetry so a
+			// slow/idle device stream never looks like a dead socket.
+			ping: 'ping',
+			pong: 'pong'
 		}
 	});
 
@@ -73,6 +81,7 @@ export function createDeviceClient({
 	let unsubscribeStatus: (() => void) | null = null;
 	let unsubscribeError: (() => void) | null = null;
 	let staleCheckTimer: ReturnType<typeof setInterval> | null = null;
+	let telemetryTimer: ReturnType<typeof setInterval> | null = null;
 	let pendingUpdate: PendingUpdate | null = null;
 
 	function setLastError(message: string | null) {
@@ -112,7 +121,6 @@ export function createDeviceClient({
 	function rejectPendingUpdate(message: string) {
 		setLastError(message);
 		clearPendingUpdate()?.reject(new Error(message));
-		connector.startHeartbeat();
 	}
 
 	function startStaleCheckTimer() {
@@ -125,6 +133,30 @@ export function createDeviceClient({
 
 		clearInterval(staleCheckTimer);
 		staleCheckTimer = null;
+	}
+
+	// Telemetry is polled on its own cadence, independent from the socket
+	// heartbeat. The server answers with a `pump:monitor` snapshot.
+	function pollTelemetry() {
+		if (state.socketStatus !== 'connected') return;
+
+		try {
+			connector.send({ cmd: 'pump:monitor' }, false);
+		} catch {
+			// Not connected right now; the status listener drives recovery.
+		}
+	}
+
+	function startTelemetryPoll() {
+		stopTelemetryPoll();
+		telemetryTimer = setInterval(pollTelemetry, pollIntervalMs);
+	}
+
+	function stopTelemetryPoll() {
+		if (!telemetryTimer) return;
+
+		clearInterval(telemetryTimer);
+		telemetryTimer = null;
 	}
 
 	function initialize() {
@@ -144,6 +176,13 @@ export function createDeviceClient({
 			if (pendingUpdate && nextStatus !== 'connected') {
 				rejectPendingUpdate(`Update interrupted: socket ${nextStatus}`);
 			}
+
+			// On every (re)connect refresh device info and grab a telemetry
+			// snapshot right away instead of waiting for the next poll tick.
+			if (nextStatus === 'connected') {
+				connector.send({ cmd: 'pump:info' });
+				pollTelemetry();
+			}
 		});
 
 		unsubscribeError = connector.onError((error) => {
@@ -159,7 +198,6 @@ export function createDeviceClient({
 			switch (message.cmd) {
 				case 'pump:monitor': {
 					applyRemoteState(message.data);
-					clearPendingUpdate()?.resolve();
 					break;
 				}
 
@@ -170,8 +208,14 @@ export function createDeviceClient({
 
 				case 'pump:toggle':
 				case 'pump:update': {
-					if (pendingUpdate) {
-						connector.startHeartbeat();
+					// Authoritative ack for our in-flight update: an update is
+					// atomic and completes on its own response, not on the next
+					// telemetry snapshot.
+					const resolved = clearPendingUpdate();
+					if (resolved) {
+						resolved.resolve();
+						// Reflect the applied change without waiting for the next tick.
+						pollTelemetry();
 					}
 					break;
 				}
@@ -179,8 +223,8 @@ export function createDeviceClient({
 		});
 
 		startStaleCheckTimer();
+		startTelemetryPoll();
 		connector.connect();
-		connector.send({ cmd: 'pump:info' });
 	}
 
 	function destroy() {
@@ -197,6 +241,7 @@ export function createDeviceClient({
 		}
 
 		stopStaleCheckTimer();
+		stopTelemetryPoll();
 		connector.disconnect();
 
 		state.initializedAt = null;
@@ -233,7 +278,6 @@ export function createDeviceClient({
 			};
 
 			try {
-				connector.stopHeartbeat();
 				if (controlsPatch === 'toggle') {
 					connector.send({ cmd: 'pump:toggle' });
 				} else {

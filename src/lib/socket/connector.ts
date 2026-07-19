@@ -14,7 +14,10 @@ import { browser } from '$app/environment';
 
 type Listener<T> = (value: T) => void;
 
-type SocketConnectorOptions<TIncoming, TOutgoing> = {
+type SocketConnectorOptions<
+	TIncoming extends { cmd: string },
+	TOutgoing extends { cmd: string }
+> = {
 	url: string;
 	parse?: (raw: string) => TIncoming;
 	validateIncoming?: (value: TIncoming) => void;
@@ -29,7 +32,11 @@ type SocketConnectorOptions<TIncoming, TOutgoing> = {
 	heartbeat?: {
 		intervalMs?: number;
 		timeoutMs?: number;
-		command?: TOutgoing;
+		// cmd sent as the ping message.
+		ping?: TOutgoing['cmd'];
+		// cmd of the expected pong reply. Defaults to the ping cmd
+		// (i.e. a symmetric ping/pong).
+		pong?: TIncoming['cmd'];
 	};
 	queue?: {
 		maxSize?: number;
@@ -62,6 +69,8 @@ export function createSocketConnector<
 
 	const heartbeatIntervalMs = heartbeat.intervalMs ?? SOCKET_CONNECTION_HEARTBEAT_INTERVAL_MS;
 	const heartbeatTimeoutMs = heartbeat.timeoutMs ?? SOCKET_CONNECTION_HEARTBEAT_TIMEOUT_MS;
+	const heartbeatPingCmd = heartbeat.ping ?? null;
+	const heartbeatPongCmd = heartbeat.pong ?? heartbeat.ping ?? null;
 
 	const queueMaxSize = queue.maxSize ?? SOCKET_COMMANDS_QUEUE_MAX_SIZE;
 
@@ -180,7 +189,7 @@ export function createSocketConnector<
 	}
 
 	function startHeartbeat(withTimeout = false) {
-		if (!heartbeat.command) {
+		if (!heartbeatPingCmd) {
 			return;
 		}
 
@@ -190,7 +199,7 @@ export function createSocketConnector<
 			if (!isOpen()) return;
 
 			try {
-				socket!.send(serialize(heartbeat.command!));
+				socket!.send(serialize({ cmd: heartbeatPingCmd } as TOutgoing));
 				resetHeartbeatTimeout();
 			} catch (error) {
 				emitError(error);
@@ -252,13 +261,16 @@ export function createSocketConnector<
 			try {
 				const message = parse(String(event.data));
 				validateIncoming?.(message);
-				// Any incoming message means the connection is alive
-				if (heartbeat.command?.cmd === message.cmd) {
-					if (!heartbeatActive) {
-						return;
+
+				// A pong keeps the connection marked alive. Liveness is a
+				// transport-level concern, so we consume the pong here instead of
+				// forwarding it to message listeners.
+				if (heartbeatPongCmd && message.cmd === heartbeatPongCmd) {
+					if (heartbeatActive) {
+						resetHeartbeatTimeout();
+						startHeartbeat(true);
 					}
-					resetHeartbeatTimeout();
-					startHeartbeat(true);
+					return;
 				}
 
 				for (const listener of messageListeners) {

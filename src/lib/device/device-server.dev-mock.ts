@@ -69,6 +69,9 @@ export function createMockDeviceServer() {
 
 	function handle(message: DeviceClientMessage): DeviceServerMessage {
 		switch (message.cmd) {
+			case 'ping':
+				return { cmd: 'pong' };
+
 			case 'pump:update':
 				break;
 

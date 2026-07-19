@@ -16,13 +16,15 @@ export type DeviceClientMessage =
 	| { cmd: 'pump:update'; data: { controls: Partial<DeviceRemoteControls> } }
 	| { cmd: 'pump:toggle' }
 	| { cmd: 'pump:monitor' }
-	| { cmd: 'pump:info' };
+	| { cmd: 'pump:info' }
+	| { cmd: 'ping' };
 
 export type DeviceServerMessage =
 	| { cmd: 'pump:update'; data: Record<string, unknown> }
 	| { cmd: 'pump:toggle'; data: Record<string, unknown> }
 	| { cmd: 'pump:monitor'; data: DeviceRemoteMonitor }
 	| { cmd: 'pump:info'; data: DeviceRemoteInfo }
+	| { cmd: 'pong' }
 	| { cmd: 'error'; data: DeviceRemoteError };
 
 export type DeviceRemoteMonitorMetrics = {

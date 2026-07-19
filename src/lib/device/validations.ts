@@ -9,11 +9,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * TypeScript does not protect data received over the network.
  */
 export function validateDeviceServerMessage(msg: DeviceServerMessage) {
-	if (!isRecord(msg) || !isRecord(msg.data) || typeof msg.cmd !== 'string') {
+	if (!isRecord(msg) || typeof msg.cmd !== 'string') {
 		console.error('Invalid message received:', msg);
 		throw new Error(`Invalid message received`);
 	}
 	const value = msg as DeviceServerMessage;
+
+	// Pong is a data-less liveness reply.
+	if (value.cmd === 'pong') {
+		return;
+	}
+
+	if (!isRecord(value.data)) {
+		console.error('Invalid message received:', msg);
+		throw new Error(`Invalid message received`);
+	}
 
 	if (
 		value.cmd === 'pump:monitor' &&
@@ -24,7 +34,11 @@ export function validateDeviceServerMessage(msg: DeviceServerMessage) {
 		return;
 	}
 
-	if (value.cmd === 'pump:toggle' || value.cmd === 'pump:update' || value.cmd === 'pump:info') {
+	if (
+		value.cmd === 'pump:toggle' ||
+		value.cmd === 'pump:update' ||
+		value.cmd === 'pump:info'
+	) {
 		return;
 	}
 
