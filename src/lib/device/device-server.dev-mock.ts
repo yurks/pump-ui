@@ -26,7 +26,8 @@ export function createMockDeviceServer() {
 			DryWorkStop: false,
 			PressureStop: false,
 			temp_stop: false,
-			user_stop: false
+			user_stop: false,
+			motor_current_state: 1
 		},
 		error: { message: 'NO_ERROR', code: 0 }
 	};
@@ -72,12 +73,15 @@ export function createMockDeviceServer() {
 			case 'ping':
 				return { cmd: 'pong' };
 
-			case 'pump:update':
-				break;
+			case 'pump:configure':
+				return { cmd: 'pump:configure', data: message.data.map((param) => param.name) };
 
 			case 'pump:toggle':
-				device.status.user_stop = !device.status.user_stop;
-				break;
+				device.status.motor_current_state = device.status.motor_current_state ? 0 : 1;
+				return {
+					cmd: 'pump:toggle',
+					data: { motor_current_state: device.status.motor_current_state }
+				};
 
 			case 'pump:info':
 				return { cmd: message.cmd, data: deviceInfo };
@@ -86,8 +90,6 @@ export function createMockDeviceServer() {
 				tick();
 				return { cmd: message.cmd, data: snapshot() };
 		}
-
-		return { cmd: message.cmd, data: {} };
 	}
 
 	return {

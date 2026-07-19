@@ -10,11 +10,11 @@
 	const info = $derived(deviceState.info);
 
 	const disabled = $derived.by(() => {
-		const state = deviceState.data?.status;
-		if (!state) {
+		const status = deviceState.data?.status;
+		if (!status) {
 			return null;
 		}
-		return Object.values(state).some(Boolean);
+		return !status.motor_current_state;
 	});
 
 	const { class: className } = $props();

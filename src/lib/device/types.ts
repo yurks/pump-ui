@@ -12,16 +12,21 @@ export type DeviceClient = {
 	updating: boolean;
 };
 
+export type DeviceSetParam = {
+	name: string;
+	value: number | string | boolean;
+};
+
 export type DeviceClientMessage =
-	| { cmd: 'pump:update'; data: { controls: Partial<DeviceRemoteControls> } }
+	| { cmd: 'pump:configure'; data: DeviceSetParam[] }
 	| { cmd: 'pump:toggle' }
 	| { cmd: 'pump:monitor' }
 	| { cmd: 'pump:info' }
 	| { cmd: 'ping' };
 
 export type DeviceServerMessage =
-	| { cmd: 'pump:update'; data: Record<string, unknown> }
-	| { cmd: 'pump:toggle'; data: Record<string, unknown> }
+	| { cmd: 'pump:configure'; data: string[] }
+	| { cmd: 'pump:toggle'; data: { motor_current_state: number } }
 	| { cmd: 'pump:monitor'; data: DeviceRemoteMonitor }
 	| { cmd: 'pump:info'; data: DeviceRemoteInfo }
 	| { cmd: 'pong' }
@@ -41,6 +46,7 @@ export type DeviceRemoteMonitorStatus = {
 	PressureStop: boolean;
 	temp_stop: boolean;
 	user_stop: boolean;
+	motor_current_state: number;
 };
 
 export type DeviceRemoteControls = {

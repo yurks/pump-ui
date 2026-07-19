@@ -34,11 +34,11 @@ export function validateDeviceServerMessage(msg: DeviceServerMessage) {
 		return;
 	}
 
-	if (
-		value.cmd === 'pump:toggle' ||
-		value.cmd === 'pump:update' ||
-		value.cmd === 'pump:info'
-	) {
+	if (value.cmd === 'pump:configure' && Array.isArray(value.data)) {
+		return;
+	}
+
+	if (value.cmd === 'pump:toggle' || value.cmd === 'pump:info') {
 		return;
 	}
 

@@ -12,7 +12,8 @@ import {
 	type DeviceClientMessage,
 	type DeviceRemoteControls,
 	type DeviceRemoteMonitor,
-	type DeviceServerMessage
+	type DeviceServerMessage,
+	type DeviceSetParam
 } from './types.ts';
 
 import { browser } from '$app/environment';
@@ -206,17 +207,21 @@ export function createDeviceClient({
 					break;
 				}
 
-				case 'pump:toggle':
-				case 'pump:update': {
-					// Authoritative ack for our in-flight update: an update is
-					// atomic and completes on its own response, not on the next
-					// telemetry snapshot.
-					const resolved = clearPendingUpdate();
-					if (resolved) {
-						resolved.resolve();
-						// Reflect the applied change without waiting for the next tick.
-						pollTelemetry();
+				case 'pump:toggle': {
+					// Toggle replies with the fresh motor state, so we reflect it
+					// immediately instead of waiting for the next telemetry snapshot.
+					if (state.data) {
+						state.data.status.motor_current_state = message.data.motor_current_state;
 					}
+					clearPendingUpdate()?.resolve();
+					break;
+				}
+
+				case 'pump:configure': {
+					// Authoritative ack for our in-flight update: an update is
+					// atomic and completes on its own response. We do not wait for
+					// the next telemetry snapshot to consider it done.
+					clearPendingUpdate()?.resolve();
 					break;
 				}
 			}
@@ -281,7 +286,10 @@ export function createDeviceClient({
 				if (controlsPatch === 'toggle') {
 					connector.send({ cmd: 'pump:toggle' });
 				} else {
-					connector.send({ cmd: 'pump:update', data: { controls: controlsPatch } });
+					const params: DeviceSetParam[] = Object.entries(controlsPatch)
+						.filter(([, value]) => value !== undefined)
+						.map(([name, value]) => ({ name, value: value as DeviceSetParam['value'] }));
+					connector.send({ cmd: 'pump:configure', data: params });
 				}
 			} catch (error) {
 				const message = error instanceof Error ? error.message : 'Failed to send update';
