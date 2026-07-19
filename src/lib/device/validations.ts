@@ -34,7 +34,12 @@ export function validateDeviceServerMessage(msg: DeviceServerMessage) {
 		return;
 	}
 
-	if (value.cmd === 'pump:configure' && Array.isArray(value.data)) {
+	if (
+		(value.cmd === 'pump:config_set' ||
+			value.cmd === 'pump:config_get' ||
+			value.cmd === 'pump:config_list') &&
+		Array.isArray(value.data)
+	) {
 		return;
 	}
 

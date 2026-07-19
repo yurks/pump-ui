@@ -32,6 +32,20 @@ export function createMockDeviceServer() {
 		error: { message: 'NO_ERROR', code: 0 }
 	};
 
+	const config: Record<string, string> = {
+		MAX_PRESSURE: '30',
+		DELTA_PSTART: '10',
+		PRESSURE_DRY: '5',
+		I_LIMIT: '8',
+		FREQ_SPEED_CHANGE: '45',
+		FLOW_SENSOR: '1',
+		ROTATE: '0',
+		PRESSURE_DELAY: '3',
+		DRY_MODE: '1',
+		DELAY_AFTER_DRY_START: '20',
+		NUM_REBUTS_FOR_DRY_START: '3'
+	};
+
 	function snapshot(): DeviceRemoteMonitor {
 		return device;
 	}
@@ -73,8 +87,26 @@ export function createMockDeviceServer() {
 			case 'ping':
 				return { cmd: 'pong' };
 
-			case 'pump:configure':
-				return { cmd: 'pump:configure', data: message.data.map((param) => param.name) };
+			case 'pump:config_list':
+				return {
+					cmd: 'pump:config_list',
+					data: Object.keys(config).map((name) => ({ name }))
+				};
+
+			case 'pump:config_get':
+				return {
+					cmd: 'pump:config_get',
+					data: message.data.map(({ name }) => ({ name, value: config[name] }))
+				};
+
+			case 'pump:config_set':
+				return {
+					cmd: 'pump:config_set',
+					data: message.data.map((param) => {
+						config[param.name] = String(param.value);
+						return param.name;
+					})
+				};
 
 			case 'pump:toggle':
 				device.status.motor_current_state = device.status.motor_current_state ? 0 : 1;

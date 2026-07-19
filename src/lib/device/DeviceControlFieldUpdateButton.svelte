@@ -36,7 +36,8 @@
 			return;
 		}
 
-		if (!controls || controls[name] === value) {
+		const current = controls?.find((param) => param.name === name)?.value;
+		if (!controls || current === value) {
 			onDone?.();
 			return;
 		}

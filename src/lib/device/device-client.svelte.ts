@@ -182,6 +182,7 @@ export function createDeviceClient({
 			// snapshot right away instead of waiting for the next poll tick.
 			if (nextStatus === 'connected') {
 				connector.send({ cmd: 'pump:info' });
+				connector.send({ cmd: 'pump:config_list' });
 				pollTelemetry();
 			}
 		});
@@ -207,6 +208,11 @@ export function createDeviceClient({
 					break;
 				}
 
+				case 'pump:config_list': {
+					state.controls = message.data;
+					break;
+				}
+
 				case 'pump:toggle': {
 					// Toggle replies with the fresh motor state, so we reflect it
 					// immediately instead of waiting for the next telemetry snapshot.
@@ -217,7 +223,7 @@ export function createDeviceClient({
 					break;
 				}
 
-				case 'pump:configure': {
+				case 'pump:config_set': {
 					// Authoritative ack for our in-flight update: an update is
 					// atomic and completes on its own response. We do not wait for
 					// the next telemetry snapshot to consider it done.
@@ -289,7 +295,7 @@ export function createDeviceClient({
 					const params: DeviceSetParam[] = Object.entries(controlsPatch)
 						.filter(([, value]) => value !== undefined)
 						.map(([name, value]) => ({ name, value: value as DeviceSetParam['value'] }));
-					connector.send({ cmd: 'pump:configure', data: params });
+					connector.send({ cmd: 'pump:config_set', data: params });
 				}
 			} catch (error) {
 				const message = error instanceof Error ? error.message : 'Failed to send update';

@@ -6,7 +6,7 @@ export type DeviceClient = {
 	lastMessageAt: number | null;
 	data: DeviceRemoteMonitor | null;
 	info: DeviceRemoteInfo | null;
-	controls: DeviceRemoteControls | null;
+	controls: DeviceConfigParam[] | null;
 	stale: boolean;
 	initializedAt: number | null;
 	updating: boolean;
@@ -17,15 +17,26 @@ export type DeviceSetParam = {
 	value: number | string | boolean;
 };
 
+// A single configuration parameter. `value` is absent in listings
+// (pump:config_list) and present when reading values (pump:config_get).
+export type DeviceConfigParam = {
+	name: string;
+	value?: string;
+};
+
 export type DeviceClientMessage =
-	| { cmd: 'pump:configure'; data: DeviceSetParam[] }
+	| { cmd: 'pump:config_set'; data: DeviceSetParam[] }
+	| { cmd: 'pump:config_get'; data: { name: string }[] }
+	| { cmd: 'pump:config_list' }
 	| { cmd: 'pump:toggle' }
 	| { cmd: 'pump:monitor' }
 	| { cmd: 'pump:info' }
 	| { cmd: 'ping' };
 
 export type DeviceServerMessage =
-	| { cmd: 'pump:configure'; data: string[] }
+	| { cmd: 'pump:config_set'; data: string[] }
+	| { cmd: 'pump:config_get'; data: DeviceConfigParam[] }
+	| { cmd: 'pump:config_list'; data: DeviceConfigParam[] }
 	| { cmd: 'pump:toggle'; data: { motor_current_state: number } }
 	| { cmd: 'pump:monitor'; data: DeviceRemoteMonitor }
 	| { cmd: 'pump:info'; data: DeviceRemoteInfo }
