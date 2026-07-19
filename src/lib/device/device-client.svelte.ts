@@ -88,6 +88,11 @@ export function createDeviceClient({
 	let errorClearTimer: ReturnType<typeof setTimeout> | null = null;
 	let pendingUpdate: PendingUpdate | null = null;
 
+	// Timestamp of the last unanswered telemetry poll, or null when none is in
+	// flight. Used to skip polls while one is outstanding so a slow device can't
+	// accumulate a backlog of monitor requests.
+	let telemetrySentAt: number | null = null;
+
 	function clearErrorTimer() {
 		if (!errorClearTimer) return;
 
@@ -127,6 +132,8 @@ export function createDeviceClient({
 		// Remote clocks drift. Humans also drift, but usually with worse excuses.
 		state.data = nextState;
 		state.lastMessageAt = Date.now();
+		// The poll this snapshot answers is no longer in flight.
+		telemetrySentAt = null;
 		// Healthy telemetry clears a lingering connection error, but never stomps
 		// a transient device error that is still counting down its display timer.
 		if (!errorClearTimer) {
@@ -197,10 +204,18 @@ export function createDeviceClient({
 	function pollTelemetry() {
 		if (state.socketStatus !== 'connected') return;
 
+		// Skip if a previous poll is still outstanding, unless it is clearly lost
+		// (older than the stale window) so a dropped reply can't stall polling.
+		if (telemetrySentAt !== null && Date.now() - telemetrySentAt < staleDataAfterMs) {
+			return;
+		}
+
 		try {
 			connector.send({ cmd: 'pump:monitor' }, false);
+			telemetrySentAt = Date.now();
 		} catch {
 			// Not connected right now; the status listener drives recovery.
+			telemetrySentAt = null;
 		}
 	}
 
@@ -223,6 +238,12 @@ export function createDeviceClient({
 
 		unsubscribeStatus = connector.onStatus((nextStatus) => {
 			state.socketStatus = nextStatus;
+
+			// Any in-flight poll dies with the old socket; let the next connect
+			// poll immediately instead of waiting out the stale window.
+			if (nextStatus !== 'connected') {
+				telemetrySentAt = null;
+			}
 
 			// If we have never received data, mark the client as stale immediately
 			// once the socket starts moving, so UI does not pretend everything is fresh.
@@ -338,6 +359,7 @@ export function createDeviceClient({
 		stopStaleCheckTimer();
 		stopTelemetryPoll();
 		clearErrorTimer();
+		telemetrySentAt = null;
 		connector.disconnect();
 
 		state.initializedAt = null;
