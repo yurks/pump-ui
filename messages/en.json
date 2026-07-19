@@ -19,10 +19,7 @@
 	"socket_error": "Error",
 	"control_on": "Switch ON",
 	"control_off": "Switch OFF",
-	"field_label__pressure_limit": "Pressure limit",
-	"field_label__temp_limit": "Temperature limit",
-	"field_label__mode": "Mode",
-	"field_desc__pressure_limit": "(0.5 – 10 atm)",
-	"field_desc__temp_limit": "",
-	"field_desc__mode": ""
+
+	"field_label__NUMBER_RANGE": "Number range [i18n label]",
+	"field_desc__NUMBER_RANGE": "[i18n description]"
 }

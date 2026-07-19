@@ -18,5 +18,8 @@
 	"socket_disconnected": "Оффлайн",
 	"socket_error": "Помилка",
 	"control_on": "Вмикнути",
-	"control_off": "Вимикнути"
+	"control_off": "Вимикнути",
+
+	"field_label__NUMBER_RANGE": "Number range [i18n лейба]",
+	"field_desc__NUMBER_RANGE": "[i18n опис]"
 }

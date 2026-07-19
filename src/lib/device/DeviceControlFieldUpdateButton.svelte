@@ -2,7 +2,7 @@
 	import { Button, type ButtonProps } from 'flowbite-svelte';
 	import type { ClassValue } from 'svelte/elements';
 
-	import type { DeviceRemoteControls } from '$lib/device/types';
+	import type { DeviceConfigValue } from '$lib/device/types';
 	import { deviceState, deviceUpdate } from '$lib/device/device.svelte';
 	import AppSpinner from '$lib/AppSpinner.svelte';
 
@@ -18,8 +18,8 @@
 		disabled
 	}: {
 		label: string;
-		name: keyof DeviceRemoteControls | 'toggle';
-		value: number | string | boolean | readonly string[] | readonly number[];
+		name: string | 'toggle';
+		value: DeviceConfigValue | boolean;
 		onDone?: () => void;
 		class?: ClassValue;
 		color?: ButtonProps['color'];
@@ -36,13 +36,14 @@
 			return;
 		}
 
+		const nextValue: DeviceConfigValue = typeof value === 'boolean' ? Number(value) : value;
 		const current = controls?.find((param) => param.name === name)?.value;
-		if (!controls || current === value) {
+		if (!controls || current === nextValue) {
 			onDone?.();
 			return;
 		}
 
-		await deviceUpdate({ [name]: value }).catch();
+		await deviceUpdate({ [name]: nextValue }).catch();
 		onDone?.();
 	}
 </script>

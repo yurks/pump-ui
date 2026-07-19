@@ -3,6 +3,7 @@
 	import type { ClassValue } from 'svelte/elements';
 
 	import { deviceState } from '$lib/device/device.svelte.js';
+	import DeviceControlField from '$lib/device/DeviceControlField.svelte';
 
 	const controls = $derived(deviceState.controls);
 
@@ -15,9 +16,7 @@
 	<Card class={className}>
 		<Listgroup class="border-0">
 			{#each controls as param (param.name)}
-				<div class="py-2 text-sm font-medium text-gray-900 dark:text-white">
-					{param.name}
-				</div>
+				<DeviceControlField {param} />
 			{/each}
 		</Listgroup>
 	</Card>

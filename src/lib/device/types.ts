@@ -88,12 +88,6 @@ export type DeviceRemoteMonitorStatus = {
 	motor_current_state: number;
 };
 
-export type DeviceRemoteControls = {
-	pressure_limit: number;
-	temp_limit: number;
-	mode: 'auto' | 'manual';
-};
-
 export type DeviceRemoteInfo = {
 	name: string;
 	firmware_hw: string;

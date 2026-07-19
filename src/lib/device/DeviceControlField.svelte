@@ -2,23 +2,36 @@
 	import { PenSolid } from 'flowbite-svelte-icons';
 	import { Button, Modal } from 'flowbite-svelte';
 
-	import { m } from '$lib/paraglide/messages.js';
-	import type { DeviceRemoteControls } from '$lib/device/types';
+	import type { DeviceConfigParam } from '$lib/device/types';
+	import { decimalsFor, fieldDesc, fieldLabel } from '$lib/device/utils';
 	import DeviceControlFieldEditor from '$lib/device/DeviceControlFieldEditor.svelte';
 
-	let {
-		name,
-		value
-	}: {
-		name: keyof DeviceRemoteControls;
-		value: number | string | boolean;
-	} = $props();
+	let { param }: { param: DeviceConfigParam } = $props();
 
-	const mLabelKey = $derived(`field_label__${name}` satisfies keyof typeof m);
-	const mDescKey = $derived(`field_desc__${name}` satisfies keyof typeof m);
+	const label = $derived(fieldLabel(param.name, param.label));
+	const desc = $derived(fieldDesc(param.name));
 
-	const label = $derived((mLabelKey in m && m[mLabelKey]()) || name);
-	const desc = $derived((mDescKey in m && m[mDescKey]()) || undefined);
+	// `value`, `min`, `max` and `step` are stored pre-scaled; the UI works in
+	// human units (raw / multiplier) and scales back only when sending.
+	const multiplier = $derived(param.multiplier || 1);
+
+	// Decimal places implied by the multiplier (10 -> 1, 100 -> 2), so scaled
+	// values render as floats (raw 80, ×10 -> "8.0").
+	const decimals = $derived(decimalsFor(multiplier));
+
+	// Enumerated params store the option id as value; show the option label instead.
+	const displayValue = $derived.by(() => {
+		const items = param.options?.items;
+		if (items?.length) {
+			return items.find((item) => item.id === param.value)?.value ?? param.value;
+		}
+		if (typeof param.value === 'number') {
+			return multiplier !== 1 ? (param.value / multiplier).toFixed(decimals) : param.value;
+		}
+		return param.value;
+	});
+
+	const editable = $derived(param.value != null);
 
 	let formModal = $state(false);
 </script>
@@ -28,22 +41,25 @@
 		<p class="truncate text-sm font-medium text-gray-900 dark:text-white">
 			{label}
 		</p>
-		<p class="truncate text-sm text-gray-500 dark:text-gray-400">
-			{desc}
-		</p>
+		{#if desc}
+			<p class="truncate text-sm text-gray-500 dark:text-gray-400">
+				{desc}
+			</p>
+		{/if}
 	</div>
 	<div class="inline-flex items-center text-base font-semibold text-gray-900 dark:text-white">
 		<div class="flex items-center gap-2">
-			{value}
-			{#if value != null}
-				<Button onclick={() => (formModal = true)} color="alternative" size="xs"
-					><PenSolid size="md" /></Button
-				>
+			{displayValue}
+			{param.measure ?? ''}
+			{#if editable}
+				<Button onclick={() => (formModal = true)} color="alternative" size="xs">
+					<PenSolid size="md" />
+				</Button>
 			{/if}
 		</div>
-		{#if value != null}
+		{#if editable}
 			<Modal bind:open={formModal} placement="bottom-center">
-				<DeviceControlFieldEditor {label} {name} {value} onDone={() => (formModal = false)} />
+				<DeviceControlFieldEditor {param} {label} onDone={() => (formModal = false)} />
 			</Modal>
 		{/if}
 	</div>

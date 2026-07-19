@@ -11,7 +11,7 @@ import {
 	type DeviceClient,
 	type DeviceClientMessage,
 	type DeviceConfigParam,
-	type DeviceRemoteControls,
+	type DeviceConfigValue,
 	type DeviceRemoteMonitor,
 	type DeviceServerMessage,
 	type DeviceSetParam
@@ -121,8 +121,9 @@ export function createDeviceClient({
 		}
 	}
 
-	// Merge freshly read values into the known params without dropping the
-	// list order we got from pump:config_list.
+	// Merge freshly read params into the known list without dropping the order
+	// we got from pump:config_list. config_list only carries names, so the value
+	// read also carries the metadata (label, type, measure, multiplier, options).
 	function applyConfigValues(params: DeviceConfigParam[]) {
 		const controls = state.controls;
 		if (!controls) return;
@@ -130,7 +131,7 @@ export function createDeviceClient({
 		for (const param of params) {
 			const existing = controls.find((c) => c.name === param.name);
 			if (existing) {
-				existing.value = param.value;
+				Object.assign(existing, param);
 			} else {
 				controls.push({ ...param });
 			}
@@ -299,7 +300,9 @@ export function createDeviceClient({
 		state.updating = false;
 	}
 
-	async function update(controlsPatch: Partial<DeviceRemoteControls> | 'toggle'): Promise<void> {
+	async function update(
+		controlsPatch: Record<string, DeviceConfigValue> | 'toggle'
+	): Promise<void> {
 		if (pendingUpdate || state.updating) {
 			const message = 'Update already in progress';
 			setLastError(message);

@@ -36,75 +36,14 @@ export function createMockDeviceServer() {
 	// Full parameter metadata keyed by name. `value` is always number or text;
 	// booleans are encoded as 0/1. `label`, `measure`, `multiplier` and
 	// `options` (and every field inside `options`) are optional.
+	//
+	// Names/labels are grouped by the editor control they trigger, so the dev UI
+	// lists one simple example of every DeviceControlFieldEditor branch in order.
 	const config: Record<string, Omit<DeviceConfigParam, 'name'>> = {
-		MAX_PRESSURE: {
-			value: 30,
-			label: 'Max pressure',
-			type: 'number',
-			measure: 'atm',
-			multiplier: 10,
-			options: { min: 10, max: 80, step: 1 }
-		},
-		DELTA_PSTART: {
-			value: 10,
-			label: 'Start delta',
-			type: 'number',
-			measure: 'atm',
-			options: { min: 1, max: 30, step: 1 }
-		},
-		PRESSURE_DRY: {
-			value: 5,
-			label: 'Dry-run pressure',
-			type: 'number',
-			measure: 'atm',
-			options: { min: 0, max: 20 }
-		},
-		I_LIMIT: {
-			value: 8,
-			label: 'Current limit',
-			type: 'number',
-			measure: 'A',
-			options: { min: 0, max: 16, step: 1 }
-		},
-		FREQ_SPEED_CHANGE: {
-			value: 45,
-			label: 'Speed change frequency',
-			type: 'number',
-			measure: 'Hz',
-			options: { min: 30, max: 60 }
-		},
-		FLOW_SENSOR: {
+		// number dropdown: options.items.length > 1, value stores the option id
+		NUMBER_DROPDOWN_3: {
 			value: 1,
-			label: 'Flow sensor',
-			type: 'number',
-			options: {
-				items: [
-					{ id: 0, value: 'Off' },
-					{ id: 1, value: 'On' }
-				]
-			}
-		},
-		ROTATE: {
-			value: 0,
-			label: 'Rotation',
-			type: 'number',
-			options: {
-				items: [
-					{ id: 0, value: 'Normal' },
-					{ id: 1, value: 'Reversed' }
-				]
-			}
-		},
-		PRESSURE_DELAY: {
-			value: 3,
-			label: 'Pressure delay',
-			type: 'number',
-			measure: 's',
-			options: { min: 0, max: 60 }
-		},
-		DRY_MODE: {
-			value: 1,
-			label: 'Dry-run mode',
+			label: 'Number dropdown (3 options)',
 			type: 'number',
 			options: {
 				items: [
@@ -114,18 +53,103 @@ export function createMockDeviceServer() {
 				]
 			}
 		},
-		DELAY_AFTER_DRY_START: {
-			value: 20,
-			label: 'Delay after dry start',
+		NUMBER_DROPDOWN_2: {
+			value: 0,
+			label: 'Number dropdown (2 options)',
 			type: 'number',
-			measure: 's',
-			options: { min: 0, max: 120 }
+			options: {
+				items: [
+					{ id: 0, value: 'Forward' },
+					{ id: 1, value: 'Reverse' }
+				]
+			}
 		},
-		NUM_REBUTS_FOR_DRY_START: {
-			value: 3,
-			label: 'Retries before dry start',
+		// text dropdown: same control, but value stores the option string
+		TEXT_DROPDOWN_3: {
+			value: 'eco',
+			label: 'Text dropdown (3 options)',
+			type: 'text',
+			options: {
+				items: [
+					{ id: 0, value: 'eco' },
+					{ id: 1, value: 'normal' },
+					{ id: 2, value: 'boost' }
+				]
+			}
+		},
+
+		// readonly: options.items.length === 1
+		READONLY_SINGLE: {
+			value: 0,
+			label: 'Readonly (single option)',
 			type: 'number',
-			options: { min: 0, max: 10, step: 1 }
+			options: { items: [{ id: 0, value: 'Magnetic' }] }
+		},
+
+		// text input: type === 'text', min/max act as minlength/maxlength
+		TEXT_INPUT: {
+			value: 'Pump-01',
+			label: 'Text input (2–16 chars)',
+			type: 'text',
+			options: { min: 2, max: 16 }
+		},
+
+		// toggle: type === 'number' && min === 0 && max === 1
+		TOGGLE_BOOL: {
+			value: 1,
+			label: 'Toggle (0/1)',
+			type: 'number',
+			options: { min: 0, max: 1 }
+		},
+
+		// number range: number with min/max/step
+		NUMBER_RANGE: {
+			value: 40,
+			label: 'Number range',
+			type: 'number',
+			measure: '°C',
+			options: { min: 0, max: 100, step: 5 }
+		},
+		// number range in human units (raw 30 -> 3.0 atm, 1.0-8.0 step 0.1)
+		NUMBER_RANGE_X10: {
+			value: 30,
+			label: 'Number range (multiplier ×10)',
+			type: 'number',
+			measure: 'atm',
+			multiplier: 10,
+			options: { min: 10, max: 80, step: 1 }
+		},
+
+		// number input: bounds, no step
+		NUMBER_BOUNDED: {
+			value: 8,
+			label: 'Number input (bounded)',
+			type: 'number',
+			measure: 'A',
+			options: { min: 0, max: 16 }
+		},
+		// number input in human units (raw 80 -> 8 A, 0-16)
+		NUMBER_BOUNDED_X10: {
+			value: 80,
+			label: 'Number input (multiplier ×10)',
+			type: 'number',
+			measure: 'A',
+			multiplier: 10,
+			options: { min: 0, max: 160 }
+		},
+		// number input with no options (unbounded)
+		NUMBER_UNBOUNDED: {
+			value: 100,
+			label: 'Number input (unbounded)',
+			type: 'number',
+			measure: 'mbar'
+		},
+		// step but no min/max -> falls back to a plain number input
+		NUMBER_STEP_FALLBACK: {
+			value: 3,
+			label: 'Number input (step only → fallback)',
+			type: 'number',
+			options: { step: 1 }
 		}
 	};
 
